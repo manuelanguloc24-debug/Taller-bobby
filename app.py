@@ -16,7 +16,7 @@ st.set_page_config(
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
 SHEET_ID = "1oZR5yx18Buk-zZyu3u60AGpc7LozijGZa2yrpOOx364"
-WEBHOOK_URL = "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT_EXEC"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbz2FbP-VhBuuwN4W9XllXtNIDeSAD1RYomEmJn-QIaEJo3-ZspTY9F_kfP9tDCeQDs/exec"
 
 ESTADOS = [
     "Diagnóstico",
@@ -507,6 +507,10 @@ with tab_registrar:
                 ultima_fila_mov = len(movimientos_df) + 1
                 if st.button("🗑️ Eliminar Último Cobro/Gasto", use_container_width=True):
                     ok, msg = enviar_webhook({"accion": "borrar", "pestana": "Movimientos", "fila_index": ultima_fila_mov})
+                    if ok:
+                        st.warning("Último movimiento eliminado.")
+                        st.cache_data.clear()
+                        st.rerun()
                     if ok:
                         st.warning("Último movimiento eliminado.")
                         st.cache_data.clear()
