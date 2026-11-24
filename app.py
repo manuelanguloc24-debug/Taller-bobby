@@ -1,6 +1,3 @@
-Copia este bloque completo y pégalo sobre el contenido de tu archivo `.py` en GitHub. Incluye el nombre **Forza** y los tres cuadros mensuales, con el diseño original.
-
-```python
 import datetime
 import json
 import re
