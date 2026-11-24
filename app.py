@@ -1,3 +1,6 @@
+Copia este bloque completo y pégalo sobre el contenido de tu archivo `.py` en GitHub. Incluye el nombre **Forza** y los tres cuadros mensuales, con el diseño original.
+
+```python
 import datetime
 import json
 import re
@@ -8,7 +11,7 @@ import plotly.express as px
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="AutoControl Pro | Gestión de Taller",
+    page_title="Forza",
     page_icon="🔧",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -31,11 +34,11 @@ ESTADOS = [
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    
+
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
     }
-    
+
     .stApp {
         background-color: #0B0D10;
         color: #F3F4F6;
@@ -123,7 +126,7 @@ def enviar_webhook(payload):
         return False, str(e)
 
 # --- BARRA LATERAL ---
-st.sidebar.markdown("## 🔧 **AutoControl Pro**")
+st.sidebar.markdown("## 🔧 **Forza**")
 st.sidebar.caption("Sistema de Gestión Automotriz")
 
 st.sidebar.link_button(
@@ -169,7 +172,7 @@ try:
         movimientos_df['id_orden'] = movimientos_df['id_orden'].astype(str).str.strip()
         movimientos_df['tipo'] = movimientos_df['tipo'].astype(str).str.strip()
         movimientos_df['fecha_dt'] = pd.to_datetime(movimientos_df['fecha'], errors='coerce')
-        
+
         cobros_por_orden = movimientos_df[movimientos_df['tipo'].str.lower() == 'cobro'].groupby('id_orden')['monto'].sum()
         gastos_por_orden = movimientos_df[movimientos_df['tipo'].str.lower() == 'gasto'].groupby('id_orden')['monto'].sum()
     else:
@@ -193,64 +196,58 @@ except Exception as e:
 # ==============================================================================
 with tab_resumen:
     hoy = pd.Timestamp.today().normalize()
-    mes_actual = hoy.strftime('%Y-%m')
-    
-    meses_lista = sorted(list(set([mes_actual] + (ordenes_df['fecha_ingreso_dt'].dropna().dt.strftime('%Y-%m').tolist() if not ordenes_df.empty else []))), reverse=True)
+    mes_actual = pd.Timestamp.now(tz='America/El_Salvador').strftime('%Y-%m')
+
+    meses = {mes_actual}
+    if not ordenes_df.empty:
+        meses.update(ordenes_df['fecha_ingreso_dt'].dropna().dt.strftime('%Y-%m'))
+        meses.update(ordenes_df['fecha_entrega_dt'].dropna().dt.strftime('%Y-%m'))
+    if not movimientos_df.empty:
+        meses.update(movimientos_df['fecha_dt'].dropna().dt.strftime('%Y-%m'))
+    meses_lista = [mes_actual] + sorted(meses - {mes_actual}, reverse=True)
     mes_consulta = st.sidebar.selectbox("Periodo Financiero:", meses_lista)
 
-    # Filtrar entregados del mes seleccionado
+    # Ventas reconocidas en la fecha de entrega.
+    entregados_mes = ordenes_df
+    ingresos_entregados = 0.0
     if not ordenes_df.empty:
         entregados_mes = ordenes_df[
             (ordenes_df['estado'] == 'Entregado') &
             (ordenes_df['fecha_entrega_dt'].dt.strftime('%Y-%m') == mes_consulta)
         ]
         ingresos_entregados = entregados_mes['precio_acordado'].sum()
-        costos_entregados = entregados_mes['gastos_directos'].sum()
-        ganancia_neta_trabajos = ingresos_entregados - costos_entregados
-        ticket_promedio = ingresos_entregados / len(entregados_mes) if len(entregados_mes) > 0 else 0.0
-        saldo_por_cobrar_total = ordenes_df['saldo_pendiente'].sum()
-    else:
-        ingresos_entregados = costos_entregados = ganancia_neta_trabajos = ticket_promedio = saldo_por_cobrar_total = 0.0
-        entregados_mes = pd.DataFrame()
 
-    # Cobros reales ingresados a caja en el mes
+    gastos_mes = 0.0
     if not movimientos_df.empty:
-        cobrado_mes = movimientos_df[
-            (movimientos_df['tipo'].str.lower() == 'cobro') &
+        gastos_mes = movimientos_df[
+            (movimientos_df['tipo'].str.lower() == 'gasto') &
             (movimientos_df['fecha_dt'].dt.strftime('%Y-%m') == mes_consulta)
         ]['monto'].sum()
-    else:
-        cobrado_mes = 0.0
+    salidas_mes = gastos_mes + costos_fijos_totales
+    ganancia_mes = ingresos_entregados - salidas_mes
 
     # --- TARJETAS KPI ---
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3 = st.columns(3)
     with k1:
         st.markdown(f"""
         <div class="kpi-card">
-            <div class="kpi-title">Trabajos Entregados ({mes_consulta})</div>
+            <div class="kpi-title">Ventas del Mes ({mes_consulta})</div>
             <div class="kpi-value">${ingresos_entregados:,.2f}</div>
             <div class="kpi-sub">{len(entregados_mes)} vehículos entregados</div>
         </div>""", unsafe_allow_html=True)
     with k2:
         st.markdown(f"""
         <div class="kpi-card">
-            <div class="kpi-title">Cobrado en Caja ({mes_consulta})</div>
-            <div class="kpi-value">${cobrado_mes:,.2f}</div>
-            <div class="kpi-sub kpi-pos">Flujo efectivo recibido</div>
+            <div class="kpi-title">Salidas del Mes ({mes_consulta})</div>
+            <div class="kpi-value">${salidas_mes:,.2f}</div>
+            <div class="kpi-sub kpi-neg">Gastos registrados y costos fijos</div>
         </div>""", unsafe_allow_html=True)
     with k3:
         st.markdown(f"""
         <div class="kpi-card">
-            <div class="kpi-title">Cartera por Cobrar Total</div>
-            <div class="kpi-value">${saldo_por_cobrar_total:,.2f}</div>
-            <div class="kpi-sub kpi-neg">Saldos pendientes en órdenes</div>
-        </div>""", unsafe_allow_html=True)
-    with k4:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Ganancia Bruta Entregados</div>
-            <div class="kpi-value">${ganancia_neta_trabajos:,.2f}</div>
-            <div class="kpi-sub">Ticket promedio: ${ticket_promedio:,.2f}</div>
+            <div class="kpi-title">Ganancia Bruta ({mes_consulta})</div>
+            <div class="kpi-value">${ganancia_mes:,.2f}</div>
+            <div class="kpi-sub">Ventas menos salidas</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -269,7 +266,7 @@ with tab_resumen:
             meta_ventas = costos_fijos_totales
 
         faltante_meta = max(0.0, meta_ventas - ingresos_entregados)
-        
+
         if meta_ventas > 0:
             df_eq = pd.DataFrame({
                 "Estado": ["Facturado Entregado", "Faltante para Equilibrio"],
@@ -292,13 +289,13 @@ with tab_resumen:
     with col_g2:
         st.markdown("#### ⚠️ Alertas: Vehículos Estancados en Taller")
         dias_alerta = st.number_input("Alertar si lleva más de (días) en la misma etapa:", min_value=1, value=4)
-        
+
         if not ordenes_df.empty:
             activas = ordenes_df[ordenes_df['estado'] != 'Entregado'].copy()
             if not activas.empty:
                 activas['dias_en_etapa'] = (hoy - activas['fecha_estado_dt']).dt.days.fillna(0).astype(int)
                 estancadas = activas[activas['dias_en_etapa'] >= dias_alerta].sort_values(by='dias_en_etapa', ascending=False)
-                
+
                 if not estancadas.empty:
                     for _, r in estancadas.iterrows():
                         st.error(f"🚨 **{r['id_orden']} · {r['placa_vehiculo']}** ({r['cliente']}) — Lleva **{r['dias_en_etapa']} días** en *{r['estado']}*")
@@ -312,9 +309,9 @@ with tab_resumen:
 # ==============================================================================
 with tab_ordenes:
     st.markdown("### 🚗 Control de Vehículos y Órdenes de Trabajo")
-    
+
     busqueda = st.text_input("🔍 Buscar por placa, cliente, servicio o número de orden:", placeholder="Ej. P123-456 o Carlos").strip().lower()
-    
+
     if not ordenes_df.empty:
         if busqueda:
             mask = (
@@ -407,7 +404,7 @@ with tab_registrar:
     # --- FORMULARIO 1: NUEVA ORDEN DE TRABAJO (CORRELATIVO REUTILIZABLE) ---
     with col_izq:
         st.markdown("#### 🚘 Abrir Nueva Orden de Trabajo")
-        
+
         siguiente_ot = "OT-001"
         if not ordenes_df.empty:
             nums = []
@@ -428,7 +425,7 @@ with tab_registrar:
             placa = st.text_input("Placa / Vehículo", placeholder="Ej. P456-789 Toyota Hilux").strip()
             cliente_nombre = st.text_input("Nombre del Cliente", placeholder="Ej. Carlos Mendoza").strip()
             servicio_desc = st.text_input("Trabajo / Servicio Solicitado", placeholder="Ej. Cambio de frenos y rectificación").strip()
-            
+
             c_ot3, c_ot4 = st.columns(2)
             with c_ot3:
                 tecnico_nombre = st.text_input("Mecánico Asignado", placeholder="Ej. Luis").strip()
@@ -462,7 +459,7 @@ with tab_registrar:
             }
             with st.form("form_movimiento", clear_on_submit=True):
                 ot_seleccionada_label = st.selectbox("Seleccionar Orden de Trabajo:", list(opciones_ot.keys()))
-                
+
                 c_m1, c_m2 = st.columns(2)
                 with c_m1:
                     tipo_mov = st.radio("Tipo de Registro:", ["Cobro", "Gasto"], horizontal=True)
@@ -511,7 +508,4 @@ with tab_registrar:
                         st.warning("Último movimiento eliminado.")
                         st.cache_data.clear()
                         st.rerun()
-                    if ok:
-                        st.warning("Último movimiento eliminado.")
-                        st.cache_data.clear()
-                        st.rerun()
+                        
